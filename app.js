@@ -66,7 +66,6 @@ async function loadFFmpeg() {
   progressText.textContent = "Đang tải FFmpeg core...";
   log("Đang tải FFmpeg (self-hosted)...");
 
-  // ✅ Self-host: worker + core + wasm đều nằm trong /ffmpeg/
   const classWorkerURL = `${location.origin}/ffmpeg/worker.js`;
   const coreURL        = `${location.origin}/ffmpeg/ffmpeg-core.js`;
   const wasmURL        = `${location.origin}/ffmpeg/ffmpeg-core.wasm`;
@@ -75,7 +74,15 @@ async function loadFFmpeg() {
   log(`core:   ${coreURL}`);
   log(`wasm:   ${wasmURL}`);
 
-  await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
+  // Timeout an toàn 90s — nếu worker chết im lặng, không treo vô hạn
+  const loadPromise = ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(
+      "Timeout 90s khi load FFmpeg. Kiểm tra Network: const.js / errors.js / worker.js phải trả 200 (không phải 404)."
+    )), 90000)
+  );
+
+  await Promise.race([loadPromise, timeoutPromise]);
 
   ffmpegLoaded = true;
   log("✅ FFmpeg đã sẵn sàng.");
