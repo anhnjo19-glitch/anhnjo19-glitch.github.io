@@ -1,8 +1,8 @@
 import { FFmpeg } from "https://esm.sh/@ffmpeg/ffmpeg@0.12.10";
 import { toBlobURL, fetchFile } from "https://esm.sh/@ffmpeg/util@0.12.1";
 
-// ✅ Điểm mấu chốt: sử dụng @ffmpeg/core (phiên bản đơn luồng), không phải core-mt
-const BASE_URL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+// Core vẫn có thể tải từ CDN và chuyển thành blob (tránh vấn đề CORS)
+const CORE_BASE = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
 
 const $ = (id) => document.getElementById(id);
 const dropZone = $("dropZone"), fileInput = $("fileInput"), browseBtn = $("browseBtn");
@@ -60,15 +60,24 @@ async function loadFFmpeg() {
   });
 
   progressWrap.hidden = false;
-  progressText.textContent = "Đang tải FFmpeg core (~30MB, lần đầu sẽ chậm)...";
-  log("Đang tải FFmpeg core (single-thread)...");
+  progressText.textContent = "Đang tải FFmpeg core...";
+  log("Đang tải FFmpeg...");
 
-  const coreURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.js`, "text/javascript");
-  const wasmURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.wasm`, "application/wasm");
+  const coreURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, "text/javascript");
+  const wasmURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, "application/wasm");
 
-  await ffmpeg.load({ coreURL, wasmURL });
+  // ✅ Điểm sửa chữa quan trọng: worker.js phải cùng nguồn gốc với trang web.
+  // Sử dụng location.origin để đảm bảo URL tuyệt đối, tránh bị phân giải thành đường dẫn file://
+  const classWorkerURL = `${location.origin}/ffmpeg/worker.js`;
+
+  await ffmpeg.load({
+    coreURL,
+    wasmURL,
+    classWorkerURL,
+  });
+
   ffmpegLoaded = true;
-  log("✅ FFmpeg đã sẵn sàng (single-thread, không cần SharedArrayBuffer).");
+  log("✅ FFmpeg đã sẵn sàng.");
 }
 
 convertBtn.addEventListener("click", async () => {
