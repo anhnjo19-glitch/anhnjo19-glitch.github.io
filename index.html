@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MP4 → AVI Converter (FFmpeg.wasm)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>🎬 MP4 → AVI (Motion JPEG)</h1>
+    <p class="subtitle">
+      Chuyển đổi hoàn toàn trong trình duyệt — không upload lên server.
+    </p>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="video/mp4,video/*" hidden />
+      <p>📁 Kéo thả file MP4 vào đây hoặc <button id="browseBtn" class="link-btn">chọn file</button></p>
+      <p class="hint" id="fileInfo">Chưa chọn file</p>
+    </div>
+
+    <details class="advanced">
+      <summary>⚙️ Tùy chỉnh tham số (nâng cao)</summary>
+      <div class="params">
+        <label>Chiều rộng (px)
+          <input type="number" id="pWidth" value="320" min="16" step="2" />
+        </label>
+        <label>FPS
+          <input type="number" id="pFps" value="12" min="1" max="60" />
+        </label>
+        <label>Chất lượng MJPEG (q:v, 2-31)
+          <input type="number" id="pQ" value="12" min="2" max="31" />
+        </label>
+        <label>Sample rate
+          <select id="pRate">
+            <option value="44100" selected>44100</option>
+            <option value="48000">48000</option>
+            <option value="22050">22050</option>
+            <option value="16000">16000</option>
+          </select>
+        </label>
+        <label>Kênh âm thanh
+          <select id="pCh">
+            <option value="1" selected>Mono (1)</option>
+            <option value="2">Stereo (2)</option>
+          </select>
+        </label>
+      </div>
+    </details>
+
+    <button id="convertBtn" class="primary-btn" disabled>
+      🚀 Bắt đầu chuyển đổi
+    </button>
+
+    <div class="progress-wrap" id="progressWrap" hidden>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <p class="progress-text" id="progressText">Đang khởi tạo FFmpeg...</p>
+    </div>
+
+    <div class="log" id="log" hidden></div>
+
+    <div class="result" id="result" hidden>
+      <video id="previewVideo" controls playsinline></video>
+      <a id="downloadLink" class="primary-btn" download="output.avi">
+        ⬇️ Tải xuống file AVI
+      </a>
+    </div>
+  </main>
+
+  <script src="coi-serviceworker.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
