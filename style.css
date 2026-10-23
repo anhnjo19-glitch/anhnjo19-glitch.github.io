@@ -9,18 +9,6 @@ body {
 h1 { margin: 0 0 .25rem; font-size: 1.8rem; }
 .subtitle { margin: 0 0 1.5rem; color: #94a3b8; font-size: .95rem; }
 
-.warning {
-  background: rgba(251, 146, 60, .12);
-  border: 1px solid #fb923c;
-  color: #fed7aa;
-  padding: .85rem 1rem; border-radius: 10px;
-  margin-bottom: 1rem; font-size: .9rem; line-height: 1.5;
-}
-.warning code {
-  background: rgba(0,0,0,.3); padding: 1px 6px;
-  border-radius: 4px; font-size: .85em;
-}
-
 .drop-zone {
   border: 2px dashed #475569; border-radius: 12px;
   padding: 2rem 1rem; text-align: center;
