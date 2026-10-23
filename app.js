@@ -1,16 +1,14 @@
 import { FFmpeg } from "https://esm.sh/@ffmpeg/ffmpeg@0.12.10";
 import { toBlobURL, fetchFile } from "https://esm.sh/@ffmpeg/util@0.12.1";
 
-// ✅ Điểm mấu chốt: dùng @ffmpeg/core chính thức (phiên bản đơn luồng), không cần SharedArrayBuffer
-const CORE_VERSION = "0.12.6";
-const BASE_URL = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
+// ✅ Điểm mấu chốt: sử dụng @ffmpeg/core (phiên bản đơn luồng), không phải core-mt
+const BASE_URL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
 
 const $ = (id) => document.getElementById(id);
 const dropZone = $("dropZone"), fileInput = $("fileInput"), browseBtn = $("browseBtn");
 const fileInfo = $("fileInfo"), convertBtn = $("convertBtn");
 const progressWrap = $("progressWrap"), progressFill = $("progressFill"), progressText = $("progressText");
 const logEl = $("log"), resultEl = $("result"), previewVideo = $("previewVideo"), downloadLink = $("downloadLink");
-const envWarning = $("envWarning");
 
 let selectedFile = null;
 let ffmpeg = null;
@@ -21,9 +19,6 @@ function log(line) {
   logEl.textContent += line + "\n";
   logEl.scrollTop = logEl.scrollHeight;
 }
-
-// Không cần kiểm tra crossOriginIsolated nữa, phiên bản đơn luồng chạy được trong môi trường bình thường
-envWarning.hidden = true;
 
 browseBtn.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
 dropZone.addEventListener("click", () => fileInput.click());
@@ -42,8 +37,8 @@ dropZone.addEventListener("drop", (e) => {
 
 function handleFile(file) {
   if (!file) return;
-  if (!file.type.startsWith("video/")) return alert("Vui lòng chọn tệp video!");
-  if (file.size > 2 * 1024 * 1024 * 1024) return alert("Tệp quá lớn (>2GB), không thể xử lý.");
+  if (!file.type.startsWith("video/")) return alert("Vui lòng chọn file video!");
+  if (file.size > 2 * 1024 * 1024 * 1024) return alert("File quá lớn (>2GB), không xử lý được.");
 
   selectedFile = file;
   fileInfo.textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
@@ -66,14 +61,14 @@ async function loadFFmpeg() {
 
   progressWrap.hidden = false;
   progressText.textContent = "Đang tải FFmpeg core (~30MB, lần đầu sẽ chậm)...";
-  log("Đang tải FFmpeg core...");
+  log("Đang tải FFmpeg core (single-thread)...");
 
   const coreURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.js`, "text/javascript");
   const wasmURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.wasm`, "application/wasm");
 
   await ffmpeg.load({ coreURL, wasmURL });
   ffmpegLoaded = true;
-  log("✅ FFmpeg đã sẵn sàng (chế độ đơn luồng).");
+  log("✅ FFmpeg đã sẵn sàng (single-thread, không cần SharedArrayBuffer).");
 }
 
 convertBtn.addEventListener("click", async () => {
@@ -87,7 +82,7 @@ convertBtn.addEventListener("click", async () => {
   try {
     await loadFFmpeg();
 
-    progressText.textContent = "Đang đọc tệp...";
+    progressText.textContent = "Đang đọc file...";
     await ffmpeg.writeFile("input.mp4", await fetchFile(selectedFile));
 
     const args = [
@@ -106,14 +101,14 @@ convertBtn.addEventListener("click", async () => {
     progressText.textContent = "Đang chuyển đổi...";
     await ffmpeg.exec(args);
 
-    progressText.textContent = "Đang tạo tệp...";
+    progressText.textContent = "Đang tạo file...";
     const data = await ffmpeg.readFile("output.avi");
     const blob = new Blob([data.buffer], { type: "video/x-msvideo" });
     const url = URL.createObjectURL(blob);
 
     downloadLink.href = url;
     downloadLink.download = selectedFile.name.replace(/\.[^.]+$/, "") + ".avi";
-    downloadLink.textContent = `⬇️ Tải xuống AVI (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+    downloadLink.textContent = `⬇️ Tải AVI (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
 
     previewVideo.src = url;
     resultEl.hidden = false;
