@@ -1,127 +1,60 @@
-import { FFmpeg } from "https://esm.sh/@ffmpeg/ffmpeg@0.12.10";
-import { toBlobURL, fetchFile } from "https://esm.sh/@ffmpeg/util@0.12.1";
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MP4 → AVI Converter (FFmpeg.wasm)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>🎬 MP4 → AVI (Motion JPEG)</h1>
+    <p class="subtitle">Chuyển đổi hoàn toàn trong trình duyệt.</p>
 
-// ✅ Điểm mấu chốt: sử dụng @ffmpeg/core (phiên bản đơn luồng), không phải core-mt
-const BASE_URL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="video/mp4,video/*" hidden />
+      <p>📁 Kéo thả file MP4 vào đây hoặc <button id="browseBtn" class="link-btn">chọn file</button></p>
+      <p class="hint" id="fileInfo">Chưa chọn file</p>
+    </div>
 
-const $ = (id) => document.getElementById(id);
-const dropZone = $("dropZone"), fileInput = $("fileInput"), browseBtn = $("browseBtn");
-const fileInfo = $("fileInfo"), convertBtn = $("convertBtn");
-const progressWrap = $("progressWrap"), progressFill = $("progressFill"), progressText = $("progressText");
-const logEl = $("log"), resultEl = $("result"), previewVideo = $("previewVideo"), downloadLink = $("downloadLink");
+    <details class="advanced">
+      <summary>⚙️ Tùy chỉnh tham số</summary>
+      <div class="params">
+        <label>Chiều rộng<input type="number" id="pWidth" value="320" min="16" step="2" /></label>
+        <label>FPS<input type="number" id="pFps" value="12" min="1" max="60" /></label>
+        <label>Chất lượng (2-31)<input type="number" id="pQ" value="12" min="2" max="31" /></label>
+        <label>Sample rate
+          <select id="pRate">
+            <option value="44100" selected>44100</option>
+            <option value="48000">48000</option>
+            <option value="22050">22050</option>
+            <option value="16000">16000</option>
+          </select>
+        </label>
+        <label>Kênh
+          <select id="pCh">
+            <option value="1" selected>Mono</option>
+            <option value="2">Stereo</option>
+          </select>
+        </label>
+      </div>
+    </details>
 
-let selectedFile = null;
-let ffmpeg = null;
-let ffmpegLoaded = false;
+    <button id="convertBtn" class="primary-btn" disabled>🚀 Bắt đầu chuyển đổi</button>
 
-function log(line) {
-  logEl.hidden = false;
-  logEl.textContent += line + "\n";
-  logEl.scrollTop = logEl.scrollHeight;
-}
+    <div class="progress-wrap" id="progressWrap" hidden>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <p class="progress-text" id="progressText">Đang khởi tạo...</p>
+    </div>
 
-browseBtn.addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
-dropZone.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+    <div class="log" id="log" hidden></div>
 
-["dragenter", "dragover"].forEach((evt) =>
-  dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add("dragover"); })
-);
-["dragleave", "drop"].forEach((evt) =>
-  dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove("dragover"); })
-);
-dropZone.addEventListener("drop", (e) => {
-  const f = e.dataTransfer.files[0];
-  if (f) handleFile(f);
-});
+    <div class="result" id="result" hidden>
+      <video id="previewVideo" controls playsinline></video>
+      <a id="downloadLink" class="primary-btn" download="output.avi">⬇️ Tải AVI</a>
+    </div>
+  </main>
 
-function handleFile(file) {
-  if (!file) return;
-  if (!file.type.startsWith("video/")) return alert("Vui lòng chọn file video!");
-  if (file.size > 2 * 1024 * 1024 * 1024) return alert("File quá lớn (>2GB), không xử lý được.");
-
-  selectedFile = file;
-  fileInfo.textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-  convertBtn.disabled = false;
-  resultEl.hidden = true;
-  logEl.textContent = "";
-  logEl.hidden = true;
-}
-
-async function loadFFmpeg() {
-  if (ffmpegLoaded) return;
-
-  ffmpeg = new FFmpeg();
-  ffmpeg.on("log", ({ message }) => log(message));
-  ffmpeg.on("progress", ({ progress, time }) => {
-    const pct = Math.max(0, Math.min(100, progress * 100));
-    progressFill.style.width = pct + "%";
-    progressText.textContent = `Đang xử lý... ${pct.toFixed(1)}% (${(time / 1e6).toFixed(1)}s)`;
-  });
-
-  progressWrap.hidden = false;
-  progressText.textContent = "Đang tải FFmpeg core (~30MB, lần đầu sẽ chậm)...";
-  log("Đang tải FFmpeg core (single-thread)...");
-
-  const coreURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.js`, "text/javascript");
-  const wasmURL = await toBlobURL(`${BASE_URL}/ffmpeg-core.wasm`, "application/wasm");
-
-  await ffmpeg.load({ coreURL, wasmURL });
-  ffmpegLoaded = true;
-  log("✅ FFmpeg đã sẵn sàng (single-thread, không cần SharedArrayBuffer).");
-}
-
-convertBtn.addEventListener("click", async () => {
-  if (!selectedFile) return;
-
-  convertBtn.disabled = true;
-  resultEl.hidden = true;
-  progressWrap.hidden = false;
-  progressFill.style.width = "0%";
-
-  try {
-    await loadFFmpeg();
-
-    progressText.textContent = "Đang đọc file...";
-    await ffmpeg.writeFile("input.mp4", await fetchFile(selectedFile));
-
-    const args = [
-      "-i", "input.mp4",
-      "-vf", `scale=${$("pWidth").value}:-2,fps=${$("pFps").value}`,
-      "-c:v", "mjpeg",
-      "-q:v", $("pQ").value,
-      "-pix_fmt", "yuvj420p",
-      "-c:a", "pcm_s16le",
-      "-ar", $("pRate").value,
-      "-ac", $("pCh").value,
-      "output.avi",
-    ];
-
-    log("\n$ ffmpeg " + args.join(" ") + "\n");
-    progressText.textContent = "Đang chuyển đổi...";
-    await ffmpeg.exec(args);
-
-    progressText.textContent = "Đang tạo file...";
-    const data = await ffmpeg.readFile("output.avi");
-    const blob = new Blob([data.buffer], { type: "video/x-msvideo" });
-    const url = URL.createObjectURL(blob);
-
-    downloadLink.href = url;
-    downloadLink.download = selectedFile.name.replace(/\.[^.]+$/, "") + ".avi";
-    downloadLink.textContent = `⬇️ Tải AVI (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
-
-    previewVideo.src = url;
-    resultEl.hidden = false;
-    progressFill.style.width = "100%";
-    progressText.textContent = "✅ Hoàn tất!";
-
-    await ffmpeg.deleteFile("input.mp4").catch(() => {});
-    await ffmpeg.deleteFile("output.avi").catch(() => {});
-  } catch (err) {
-    console.error(err);
-    progressText.textContent = "❌ Lỗi: " + err.message;
-    log("ERROR: " + err.message);
-  } finally {
-    convertBtn.disabled = false;
-  }
-});
+  <script type="module" src="app.js"></script>
+</body>
+</html>
